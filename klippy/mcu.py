@@ -201,6 +201,7 @@ class MCU_pwm:
         self._last_clock = self._mcu.print_time_to_clock(printtime + 0.200)
         cycle_ticks = self._mcu.seconds_to_clock(self._cycle_time)
         if self._hardware_pwm:
+            self._mcu.request_move_queue_slot()
             self._pwm_max = self._mcu.get_constant_float("PWM_MAX")
             if self._is_static:
                 self._mcu.add_config_cmd(
@@ -217,11 +218,11 @@ class MCU_pwm:
                    self._shutdown_value * self._pwm_max,
                    self._mcu.seconds_to_clock(self._max_duration)))
             svalue = int(self._start_value * self._pwm_max + 0.5)
-            self._mcu.add_config_cmd("schedule_pwm_out oid=%d clock=%d value=%d"
+            self._mcu.add_config_cmd("queue_pwm_out oid=%d clock=%d value=%d"
                                      % (self._oid, self._last_clock, svalue),
                                      on_restart=True)
             self._set_cmd = self._mcu.lookup_command(
-                "schedule_pwm_out oid=%c clock=%u value=%hu", cq=cmd_queue)
+                "queue_pwm_out oid=%c clock=%u value=%hu", cq=cmd_queue)
             return
         # Software PWM
         if self._shutdown_value not in [0., 1.]:
