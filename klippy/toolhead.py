@@ -175,6 +175,8 @@ class MoveQueue:
         self.toolhead._process_moves(queue[:flush_count])
         # Remove processed moves from the queue
         del queue[:flush_count]
+        # logging.debug("Queue length: %d", (len(queue)))
+        self.toolhead.extruder.flush_volumetric_temp()
     def add_move(self, move):
         self.queue.append(move)
         if len(self.queue) == 1:
@@ -419,6 +421,8 @@ class ToolHead:
         self.move_queue.add_move(move)
         if self.print_time > self.need_check_stall:
             self._check_stall()
+        # logging.debug("Move %s: ", (str(vars(move))))
+        # self.extruder.flush_volumetric_temp()
     def manual_move(self, coord, speed):
         curpos = list(self.commanded_pos)
         for i in range(len(coord)):
