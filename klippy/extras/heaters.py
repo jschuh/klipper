@@ -39,6 +39,7 @@ class Heater:
         self.lock = threading.Lock()
         self.last_temp = self.smoothed_temp = self.target_temp = 0.
         self.last_temp_time = 0.
+        self.volumetric = VolumetricTemperature(self)
         # pwm caching
         self.next_pwm_time = 0.
         self.last_pwm_value = 0.
@@ -93,11 +94,24 @@ class Heater:
         return self.max_power
     def get_smooth_time(self):
         return self.smooth_time
-    def set_temp(self, degrees):
+    def check_target_range(self, degrees):
         if degrees and (degrees < self.min_temp or degrees > self.max_temp):
             raise self.printer.command_error(
                 "Requested temperature (%.1f) out of range (%.1f:%.1f)"
                 % (degrees, self.min_temp, self.max_temp))
+    def set_volumetric_scaling(self, scale_factor, temp_min, temp_max):
+        self.volumetric.update(scale_factor, temp_min, temp_max)
+        self.update_volumetric_flow(0)
+    def update_volumetric_flow(self, flow_rate):
+        if not self.volumetric.is_active():
+            return
+        degrees = self.volumetric.calc_temp(flow_rate)
+        with self.lock:
+            self.target_temp = degrees
+        logging.debug("volumetric flow: %4.0f, temperature target: %3.1f", flow_rate, degrees)
+    def set_temp(self, degrees):
+        self.check_target_range(degrees)
+        self.volumetric.clear()
         with self.lock:
             self.target_temp = degrees
     def get_temp(self, eventtime):
@@ -139,6 +153,33 @@ class Heater:
     def cmd_SET_HEATER_TEMPERATURE(self, gcmd):
         temp = gcmd.get_float('TARGET', 0.)
         self.set_temp(temp)
+
+
+######################################################################
+# Volumetric temperature control
+######################################################################
+
+class VolumetricTemperature:
+    def __init__(self, heater):
+        self.heater = heater
+        self.scale_factor = 0
+        self.temp_min = 0
+        self.temp_max = 0
+    def update(self, scale_factor, temp_min, temp_max):
+        self.heater.check_target_range(temp_min)
+        self.heater.check_target_range(temp_max)
+        self.scale_factor = scale_factor
+        self.temp_min = temp_min
+        self.temp_max = temp_max
+    def clear(self):
+        self.scale_factor = self.temp_min = self.temp_max = 0
+    def is_active(self):
+        return self.scale_factor > 0.
+    def calc_temp(self,flow_rate):
+        return round(min(flow_rate * self.scale_factor + self.temp_min, self.temp_max))
+    def get_status(self, eventtime):
+        return {'factor': self.scale_factor, 'min': self.temp_min,
+                'max': self.temp_max}
 
 
 ######################################################################

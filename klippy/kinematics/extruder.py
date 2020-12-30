@@ -45,6 +45,8 @@ class PrinterExtruder:
         pressure_advance = config.getfloat('pressure_advance', 0., minval=0.)
         smooth_time = config.getfloat('pressure_advance_smooth_time',
                                       0.040, above=0., maxval=.200)
+        self.extrude_flow_now = 0.
+        self.extrude_flow_last = 0.
         # Setup iterative solver
         ffi_main, ffi_lib = chelper.get_ffi()
         self.trapq = ffi_main.gc(ffi_lib.trapq_alloc(), ffi_lib.trapq_free)
@@ -66,15 +68,26 @@ class PrinterExtruder:
             gcode.register_mux_command("SET_PRESSURE_ADVANCE", "EXTRUDER", None,
                                        self.cmd_default_SET_PRESSURE_ADVANCE,
                                        desc=self.cmd_SET_PRESSURE_ADVANCE_help)
+            gcode.register_mux_command("SET_VOLUMETRIC_TEMPERATURE", "EXTRUDER", None,
+                                       self.cmd_default_SET_VOLUMETRIC_TEMPERATURE,
+                                       desc=self.cmd_SET_VOLUMETRIC_TEMPERATURE_help)
         gcode.register_mux_command("SET_PRESSURE_ADVANCE", "EXTRUDER",
                                    self.name, self.cmd_SET_PRESSURE_ADVANCE,
                                    desc=self.cmd_SET_PRESSURE_ADVANCE_help)
+        gcode.register_mux_command("SET_VOLUMETRIC_TEMPERATURE", "EXTRUDER",
+                                   self.name, self.cmd_SET_VOLUMETRIC_TEMPERATURE,
+                                   desc=self.cmd_SET_VOLUMETRIC_TEMPERATURE)
         gcode.register_mux_command("ACTIVATE_EXTRUDER", "EXTRUDER",
                                    self.name, self.cmd_ACTIVATE_EXTRUDER,
                                    desc=self.cmd_ACTIVATE_EXTRUDER_help)
         gcode.register_mux_command("SET_EXTRUDER_STEP_DISTANCE", "EXTRUDER",
                                    self.name, self.cmd_SET_E_STEP_DISTANCE,
                                    desc=self.cmd_SET_E_STEP_DISTANCE_help)
+    def flush_volumetric_temp(self):
+        if self.extrude_flow_now == self.extrude_flow_last:
+            self.heater.update_volumetric_flow(self.extrude_flow_now)
+        self.extrude_flow_last = self.extrude_flow_now
+        self.extrude_flow_now = 0.
     def update_move_time(self, flush_time):
         self.trapq_free_moves(self.trapq, flush_time)
     def _set_pressure_advance(self, pressure_advance, smooth_time):
@@ -144,6 +157,9 @@ class PrinterExtruder:
         pressure_advance = 0.
         if axis_r > 0. and (move.axes_d[0] or move.axes_d[1]):
             pressure_advance = self.pressure_advance
+        if move.cruise_v > self.extrude_flow_now:
+            self.extrude_flow_now = move.cruise_v
+            #logging.info("Volumetric move: %s", (str(vars(move))))
         # Queue movement (x is extruder movement, y is pressure advance)
         self.trapq_append(self.trapq, print_time,
                           move.accel_t, move.cruise_t, move.decel_t,
@@ -211,6 +227,18 @@ class PrinterExtruder:
         toolhead.flush_step_generation()
         toolhead.set_extruder(self, self.stepper.get_commanded_position())
         self.printer.send_event("extruder:activate_extruder")
+    cmd_SET_VOLUMETRIC_TEMPERATURE_help = "Set volumetric temperature scaling"
+    def cmd_default_SET_VOLUMETRIC_TEMPERATURE(self, gcmd):
+        extruder = self.printer.lookup_object('toolhead').get_extruder()
+        extruder.cmd_SET_VOLUMETRIC_TEMPERATURE(gcmd)
+    def cmd_SET_VOLUMETRIC_TEMPERATURE(self, gcmd):
+        v_factor = gcmd.get_float('FACTOR', above=0)
+        v_min = gcmd.get_float('MINIMUM')
+        v_max = gcmd.get_float('MAXIMUM', minval=v_min)
+        self.heater.set_volumetric_scaling(v_factor, v_min, v_max)
+        gcmd.respond_info("Extruder '%s' volumetric temperature scaling is: "
+                          "scale factor=%0.2f, maximum=%.0f, minimum=%.0f"
+                          % (self.name, v_factor, v_min, v_max))
 
 # Dummy extruder class used when a printer has no extruder at all
 class DummyExtruder:
@@ -226,6 +254,8 @@ class DummyExtruder:
         return ""
     def get_heater(self):
         raise self.printer.command_error("Extruder not configured")
+    def flush_volumetric_temp(self):
+        pass
 
 def add_printer_objects(config):
     printer = config.get_printer()
