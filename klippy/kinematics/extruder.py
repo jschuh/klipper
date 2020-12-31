@@ -45,9 +45,9 @@ class PrinterExtruder:
         pressure_advance = config.getfloat('pressure_advance', 0., minval=0.)
         smooth_time = config.getfloat('pressure_advance_smooth_time',
                                       0.040, above=0., maxval=.200)
-        self.extrude_flow_now = 0.
-        self.extrude_flow_last = 0.
-        self. extrude_flow_time = 0.
+        self.ext_flow = 0.
+        self.ext_flow_last = 0.
+        self. ext_flow_time = 0.
         # Setup iterative solver
         ffi_main, ffi_lib = chelper.get_ffi()
         self.trapq = ffi_main.gc(ffi_lib.trapq_alloc(), ffi_lib.trapq_free)
@@ -85,12 +85,12 @@ class PrinterExtruder:
                                    self.name, self.cmd_SET_E_STEP_DISTANCE,
                                    desc=self.cmd_SET_E_STEP_DISTANCE_help)
     def update_move_time(self, flush_time):
-        flow_diff = abs(self.extrude_flow_now - self.extrude_flow_last)
-        if (flow_diff * self.extrude_flow_time) > 250 and self.extrude_flow_time > 1:
-            self.heater.update_volumetric_flow(self.extrude_flow_now)
-            self.extrude_flow_last = self.extrude_flow_now
-            self.extrude_flow_time = 0.
-        self.extrude_flow_now = 0.
+        flow_diff = abs(self.ext_flow - self.ext_flow_last)
+        if (flow_diff * self.ext_flow_time) > 10.: # Minimum extrusion for change (mm)
+            if (flow_diff > 1.): # Minimum rate change to update temp (mm/s)
+                self.heater.update_volumetric_flow(self.ext_flow)
+                self.ext_flow_last = self.ext_flow
+            self.ext_flow_time = 0.
         self.trapq_free_moves(self.trapq, flush_time)
     def _set_pressure_advance(self, pressure_advance, smooth_time):
         old_smooth_time = self.pressure_advance_smooth_time
@@ -159,16 +159,20 @@ class PrinterExtruder:
         pressure_advance = 0.
         if axis_r > 0. and (move.axes_d[0] or move.axes_d[1]):
             pressure_advance = self.pressure_advance
-        move_t = move.accel_t + move.cruise_t + move.decel_t
-        if move_t > 0.1 and move.cruise_v > self.extrude_flow_now:
-            self.extrude_flow_now = move.cruise_v
-        self. extrude_flow_time += move_t
         # Queue movement (x is extruder movement, y is pressure advance)
         self.trapq_append(self.trapq, print_time,
                           move.accel_t, move.cruise_t, move.decel_t,
                           move.start_pos[3], 0., 0.,
                           1., pressure_advance, 0.,
                           start_v, cruise_v, accel)
+        # logging.debug("new flow: %4.1f  new time: %5.3f  old flow: %4.1f  "
+        #               "old time: %6.3f", (move.axes_d[3] / move.min_move_t),
+        #               move.min_move_t, self.ext_flow, self.ext_flow_time)
+        forward_weight = 4
+        self.ext_flow = (forward_weight * move.axes_d[3] + self.ext_flow *
+                         self.ext_flow_time) / (forward_weight *
+                          move.min_move_t + self.ext_flow_time)
+        self.ext_flow_time += move.min_move_t
     def cmd_M104(self, gcmd, wait=False):
         # Set Extruder Temperature
         temp = gcmd.get_float('S', 0.)

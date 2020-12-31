@@ -108,7 +108,7 @@ class Heater:
         degrees = self.volumetric.calc_temp(flow_rate)
         with self.lock:
             self.target_temp = degrees
-        logging.debug("volumetric flow: %4.0f, temperature target: %3.1f", flow_rate, degrees)
+        logging.debug("volumetric flow: %.0f, temperature target: %3.1f", flow_rate, degrees)
     def set_temp(self, degrees):
         self.check_target_range(degrees)
         self.volumetric.clear()
