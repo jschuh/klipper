@@ -90,7 +90,6 @@ class PrinterExtruder:
             self.heater.update_volumetric_flow(self.extrude_flow_now)
             self.extrude_flow_last = self.extrude_flow_now
             self.extrude_flow_time = 0.
-            #logging.debug("Time %s:", (self. extrude_flow_time))
         self.extrude_flow_now = 0.
         self.trapq_free_moves(self.trapq, flush_time)
     def _set_pressure_advance(self, pressure_advance, smooth_time):
@@ -160,10 +159,10 @@ class PrinterExtruder:
         pressure_advance = 0.
         if axis_r > 0. and (move.axes_d[0] or move.axes_d[1]):
             pressure_advance = self.pressure_advance
-        if move.cruise_t > .01 and move.cruise_v > self.extrude_flow_now:
+        move_t = move.accel_t + move.cruise_t + move.decel_t
+        if move_t > 0.1 and move.cruise_v > self.extrude_flow_now:
             self.extrude_flow_now = move.cruise_v
-        self. extrude_flow_time += move.accel_t + move.cruise_t + move.decel_t
-            #logging.info("Volumetric move: %s", (str(vars(move))))
+        self. extrude_flow_time += move_t
         # Queue movement (x is extruder movement, y is pressure advance)
         self.trapq_append(self.trapq, print_time,
                           move.accel_t, move.cruise_t, move.decel_t,
