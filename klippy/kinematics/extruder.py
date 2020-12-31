@@ -84,14 +84,14 @@ class PrinterExtruder:
         gcode.register_mux_command("SET_EXTRUDER_STEP_DISTANCE", "EXTRUDER",
                                    self.name, self.cmd_SET_E_STEP_DISTANCE,
                                    desc=self.cmd_SET_E_STEP_DISTANCE_help)
-    def flush_volumetric_temp(self):
-        if abs(self.extrude_flow_now - self.extrude_flow_last) > 1. and self. extrude_flow_time > 1.:
+    def update_move_time(self, flush_time):
+        flow_diff = abs(self.extrude_flow_now - self.extrude_flow_last)
+        if (flow_diff * self.extrude_flow_time) > 250 and self.extrude_flow_time > 1:
             self.heater.update_volumetric_flow(self.extrude_flow_now)
             self.extrude_flow_last = self.extrude_flow_now
-            logging.debug("Time %s:", (self. extrude_flow_time))
+            self.extrude_flow_time = 0.
+            #logging.debug("Time %s:", (self. extrude_flow_time))
         self.extrude_flow_now = 0.
-        self. extrude_flow_time = 0.
-    def update_move_time(self, flush_time):
         self.trapq_free_moves(self.trapq, flush_time)
     def _set_pressure_advance(self, pressure_advance, smooth_time):
         old_smooth_time = self.pressure_advance_smooth_time
@@ -160,7 +160,7 @@ class PrinterExtruder:
         pressure_advance = 0.
         if axis_r > 0. and (move.axes_d[0] or move.axes_d[1]):
             pressure_advance = self.pressure_advance
-        if move.cruise_v > self.extrude_flow_now:
+        if move.cruise_t > .01 and move.cruise_v > self.extrude_flow_now:
             self.extrude_flow_now = move.cruise_v
         self. extrude_flow_time += move.accel_t + move.cruise_t + move.decel_t
             #logging.info("Volumetric move: %s", (str(vars(move))))
@@ -258,8 +258,6 @@ class DummyExtruder:
         return ""
     def get_heater(self):
         raise self.printer.command_error("Extruder not configured")
-    def flush_volumetric_temp(self):
-        pass
 
 def add_printer_objects(config):
     printer = config.get_printer()
