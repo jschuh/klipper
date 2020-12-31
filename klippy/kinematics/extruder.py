@@ -47,6 +47,7 @@ class PrinterExtruder:
                                       0.040, above=0., maxval=.200)
         self.extrude_flow_now = 0.
         self.extrude_flow_last = 0.
+        self. extrude_flow_time = 0.
         # Setup iterative solver
         ffi_main, ffi_lib = chelper.get_ffi()
         self.trapq = ffi_main.gc(ffi_lib.trapq_alloc(), ffi_lib.trapq_free)
@@ -84,10 +85,12 @@ class PrinterExtruder:
                                    self.name, self.cmd_SET_E_STEP_DISTANCE,
                                    desc=self.cmd_SET_E_STEP_DISTANCE_help)
     def flush_volumetric_temp(self):
-        if self.extrude_flow_now == self.extrude_flow_last:
+        if abs(self.extrude_flow_now - self.extrude_flow_last) > 1. and self. extrude_flow_time > 1.:
             self.heater.update_volumetric_flow(self.extrude_flow_now)
-        self.extrude_flow_last = self.extrude_flow_now
+            self.extrude_flow_last = self.extrude_flow_now
+            logging.debug("Time %s:", (self. extrude_flow_time))
         self.extrude_flow_now = 0.
+        self. extrude_flow_time = 0.
     def update_move_time(self, flush_time):
         self.trapq_free_moves(self.trapq, flush_time)
     def _set_pressure_advance(self, pressure_advance, smooth_time):
@@ -159,6 +162,7 @@ class PrinterExtruder:
             pressure_advance = self.pressure_advance
         if move.cruise_v > self.extrude_flow_now:
             self.extrude_flow_now = move.cruise_v
+        self. extrude_flow_time += move.accel_t + move.cruise_t + move.decel_t
             #logging.info("Volumetric move: %s", (str(vars(move))))
         # Queue movement (x is extruder movement, y is pressure advance)
         self.trapq_append(self.trapq, print_time,
