@@ -101,7 +101,6 @@ class Heater:
                 % (degrees, self.min_temp, self.max_temp))
     def set_volumetric_scaling(self, scale_factor, temp_min, temp_max):
         self.volumetric.update(scale_factor, temp_min, temp_max)
-        self.update_volumetric_flow(0)
     def update_volumetric_flow(self, flow_rate):
         if not self.volumetric.is_active():
             return
