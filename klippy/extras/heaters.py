@@ -3,7 +3,7 @@
 # Copyright (C) 2016-2020  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import logging, threading
+import collections, logging, threading
 
 
 ######################################################################
@@ -99,15 +99,6 @@ class Heater:
             raise self.printer.command_error(
                 "Requested temperature (%.1f) out of range (%.1f:%.1f)"
                 % (degrees, self.min_temp, self.max_temp))
-    def set_volumetric_scaling(self, scale_factor, temp_min, temp_max):
-        self.volumetric.update(scale_factor, temp_min, temp_max)
-    def update_volumetric_flow(self, flow_rate):
-        if not self.volumetric.is_active():
-            return
-        degrees = self.volumetric.calc_temp(flow_rate)
-        with self.lock:
-            self.target_temp = degrees
-        logging.debug("volumetric flow: %.0f, temperature target: %3.1f", flow_rate, degrees)
     def set_temp(self, degrees):
         self.check_target_range(degrees)
         self.volumetric.clear()
@@ -162,21 +153,53 @@ class Heater:
 class VolumetricTemperature:
     def __init__(self, heater):
         self.heater = heater
-        self.scale_factor = 0
-        self.temp_min = 0
-        self.temp_max = 0
-    def update(self, scale_factor, temp_min, temp_max):
-        self.heater.check_target_range(temp_min)
-        self.heater.check_target_range(temp_max)
+        self.reactor = heater.printer.get_reactor()
+        self.volumetric_flow_timer = self.reactor.register_timer(
+            self.volumetric_flow_tracker)
+        self.scale_factor = 0.
+        self.temp_min = 0.
+        self.temp_max = 0.
+        self._flow_window_length = 8
+        self._flow_window = collections.deque(maxlen=self._flow_window_length)
+        self._sample_interval = .250
+    def set_temp_targets(self, scale_factor, temp_min, temp_max):
+        if scale_factor <= 0.:
+            if self.scale_factor > 0.:
+                self.reactor.update_timer(self.volumetric_flow_timer,
+                                          self.reactor.NEVER)
+                self._flow_window.clear()
+            self.temp_max = self.temp_min = 0.
+        else:
+            self.heater.check_target_range(temp_min)
+            self.heater.check_target_range(temp_max)
+            if self.scale_factor <= 0.:
+                self._flow_window.appendleft(0.)
+                self.reactor.update_timer(self.volumetric_flow_timer,
+                                          self._sample_interval)
+            self.temp_min = temp_min
+            self.temp_max = temp_max
         self.scale_factor = scale_factor
-        self.temp_min = temp_min
-        self.temp_max = temp_max
+    def volumetric_flow_tracker(self, eventtime):
+        # Accumulate samples before doing anything
+        if len(self._flow_window) == self._flow_window_length:
+            flow_rate = sum(self._flow_window) / (len(self._flow_window) * self._sample_interval)
+            degrees = round(min(flow_rate * self.scale_factor + self.temp_min,
+                                self.temp_max))
+            with self.lock:
+                self.target_temp = degrees
+            logging.debug("volumetric flow: %.0f, temperature target: %3.1f",
+                          flow_rate, degrees)
+        if (self._flow_window) > 0:
+            self._flow_window.appendleft(0.)
+            return eventtime + self._sample_interval
+        return self.reactor.NEVER
+    def update_flow(self, distance):
+        if self.is_active():
+            self._flow_window[0] += distance
     def clear(self):
-        self.scale_factor = self.temp_min = self.temp_max = 0
+        self.set_temp_targets(0., 0., 0.)
     def is_active(self):
         return self.scale_factor > 0.
-    def calc_temp(self,flow_rate):
-        return round(min(flow_rate * self.scale_factor + self.temp_min, self.temp_max))
     def get_status(self, eventtime):
         return {'factor': self.scale_factor, 'min': self.temp_min,
                 'max': self.temp_max}
