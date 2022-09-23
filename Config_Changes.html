@@ -146,20 +146,32 @@
             <ul class="md-select__list">
               
                 <li class="md-select__item">
-                  <a href="Config_Changes.html" hreflang="en" class="md-select__link">
+                  <a href="/" hreflang="en" class="md-select__link">
                     English
                   </a>
                 </li>
                 
                 <li class="md-select__item">
-                  <a href="zh_HS/Config_Changes.html" hreflang="zh_HS" class="md-select__link">
+                  <a href="/zh/" hreflang="zh" class="md-select__link">
                     简体中文
                   </a>
                 </li>
                 
                 <li class="md-select__item">
-                  <a href="zh_HT/Config_Changes.html" hreflang="zh_HT" class="md-select__link">
+                  <a href="/zh-Hant/" hreflang="zh-Hant" class="md-select__link">
                     繁體中文
+                  </a>
+                </li>
+                
+                <li class="md-select__item">
+                  <a href="/hu/" hreflang="hu" class="md-select__link">
+                    Magyar
+                  </a>
+                </li>
+                
+                <li class="md-select__item">
+                  <a href="/it/" hreflang="it" class="md-select__link">
+                    Italiano
                   </a>
                 </li>
                 
@@ -858,6 +870,20 @@
   
   
     <li class="md-nav__item">
+      <a href="Exclude_Object.html" class="md-nav__link">
+        Exclude Objects
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
       <a href="Using_PWM_Tools.html" class="md-nav__link">
         Using PWM tools
       </a>
@@ -1192,6 +1218,21 @@
   
 
     
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="Sponsors.html" class="md-nav__link">
+        Sponsors
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -1248,6 +1289,25 @@ are not backwards compatible. It is a good idea to review this
 document when upgrading the Klipper software.</p>
 <p>All dates in this document are approximate.</p>
 <h2 id="changes">Changes<a class="headerlink" href="#changes" title="Permanent link">&para;</a></h2>
+<p>20220616: It was previously possible to flash an rp2040 in bootloader
+mode by running <code>make flash FLASH_DEVICE=first</code>. The equivalent
+command is now <code>make flash FLASH_DEVICE=2e8a:0003</code>.</p>
+<p>20220612: The rp2040 micro-controller now has a workaround for the
+"rp2040-e5" USB errata. This should make initial USB connections more
+reliable. However, it may result in a change in behavior for the
+gpio15 pin. It is unlikely the gpio15 behavior change will be
+noticeable.</p>
+<p>20220407: The temperature_fan <code>pid_integral_max</code> config option has
+been removed (it was deprecated on 20210612).</p>
+<p>20220407: The default color order for pca9632 LEDs is now "RGBW". Add
+an explicit <code>color_order: RBGW</code> setting to the pca9632 config section
+to obtain the previous behavior.</p>
+<p>20220330: The format of the <code>printer.neopixel.color_data</code> status
+information for neopixel and dotstar modules has changed. The
+information is now stored as a list of color lists (instead of a list
+of dictionaries). See the <a href="Status_Reference.html#led">status reference</a>
+for details.</p>
+<p>20220307: <code>M73</code> will no longer set print progress to 0 if <code>P</code> is missing.</p>
 <p>20220304: There is no longer a default for the <code>extruder</code> parameter of
 <a href="Config_Reference.html#extruder_stepper">extruder_stepper</a> config
 sections. If desired, specify <code>extruder: extruder</code> explicitly to

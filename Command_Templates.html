@@ -146,20 +146,32 @@
             <ul class="md-select__list">
               
                 <li class="md-select__item">
-                  <a href="Command_Templates.html" hreflang="en" class="md-select__link">
+                  <a href="/" hreflang="en" class="md-select__link">
                     English
                   </a>
                 </li>
                 
                 <li class="md-select__item">
-                  <a href="zh_HS/Command_Templates.html" hreflang="zh_HS" class="md-select__link">
+                  <a href="/zh/" hreflang="zh" class="md-select__link">
                     简体中文
                   </a>
                 </li>
                 
                 <li class="md-select__item">
-                  <a href="zh_HT/Command_Templates.html" hreflang="zh_HT" class="md-select__link">
+                  <a href="/zh-Hant/" hreflang="zh-Hant" class="md-select__link">
                     繁體中文
+                  </a>
+                </li>
+                
+                <li class="md-select__item">
+                  <a href="/hu/" hreflang="hu" class="md-select__link">
+                    Magyar
+                  </a>
+                </li>
+                
+                <li class="md-select__item">
+                  <a href="/it/" hreflang="it" class="md-select__link">
+                    Italiano
                   </a>
                 </li>
                 
@@ -952,6 +964,20 @@
   
   
     <li class="md-nav__item">
+      <a href="Exclude_Object.html" class="md-nav__link">
+        Exclude Objects
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
       <a href="Using_PWM_Tools.html" class="md-nav__link">
         Using PWM tools
       </a>
@@ -1286,6 +1312,21 @@
   
 
     
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="Sponsors.html" class="md-nav__link">
+        Sponsors
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -1531,15 +1572,11 @@ gcode:
 </code></pre></div>
 
 <h3 id="the-rawparams-variable">The "rawparams" variable<a class="headerlink" href="#the-rawparams-variable" title="Permanent link">&para;</a></h3>
-<p>The full unparsed parameters for the running macro can be access via the <code>rawparams</code> pseudo-variable.</p>
-<p>This is quite useful if you want to change the behavior of certain commands like the <code>M117</code>. For example:</p>
-<div class="highlight"><pre><span></span><code>[gcode_macro M117]
-rename_existing: M117.1
-gcode:
-  M117.1 { rawparams }
-  M118 { rawparams }
-</code></pre></div>
-
+<p>The full unparsed parameters for the running macro can be access via the
+<code>rawparams</code> pseudo-variable.</p>
+<p>Note that this will include any comments that were part of the original command.</p>
+<p>See the <a href="https://github.com/Klipper3d/klipper/blob/master/config/sample-macros.cfg">sample-macros.cfg</a> file for an example
+showing how to override the <code>M117</code> command using <code>rawparams</code>.</p>
 <h3 id="the-printer-variable">The "printer" Variable<a class="headerlink" href="#the-printer-variable" title="Permanent link">&para;</a></h3>
 <p>It is possible to inspect (and alter) the current state of the printer
 via the <code>printer</code> pseudo-variable. For example:</p>
